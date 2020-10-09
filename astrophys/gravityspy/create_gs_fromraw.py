@@ -52,25 +52,24 @@ for dfidx in tqdm(dfidxs[idx_start:idx_stop]):
 	t_f = (metadata['event_time'][dfidx]) + Tc/2
 	detector = metadata['ifo'][dfidx][0]
 	data = condition_chunks(t_i, t_f, Tc=Tc, To=To, local=True, fw=fw, qtrans=False, 
-                            qsplit=False, dT=dT, detector=detector, save=False)[0]
-    qt = data.q_transform(frange=(10, 2048), qrange=(4, 100), whiten=True, tres=min(scales)/input_shape[0], 
-                          logf=True, fres=input_shape[1])
-    x_shifts = []
-    for shift in shifts:
-        x_scales = []
-        for scale in scales:
-            x_scales.append(qt.crop(metadata['event_time'][dfidx] - scale / 2 + shifts[shift_idx], 
-                                    metadata['event_time'][dfidx] + scale / 2 + shifts[shift_idx])\
-                                    [::int(scale/min(scales))])
-        x_shifts.append(x_scales)
+							qsplit=False, dT=dT, detector=detector, save=False)[0]
+	qt = data.q_transform(frange=(10, 2048), qrange=(4, 100), whiten=True, tres=min(scales)/input_shape[0], 
+						  logf=True, fres=input_shape[1])
+	x_shifts = []
+	for shift in shifts:
+		x_scales = []
+		for scale in scales:
+			x_scales.append(qt.crop(metadata['event_time'][dfidx] - scale / 2 + shifts[shift_idx], 
+			metadata['event_time'][dfidx] + scale / 2 + shifts[shift_idx])[::int(scale/min(scales))])
+		x_shifts.append(x_scales)
 
 	x.append(x_shifts)
 	y.append(metadata['label'][dfidx])
 	times.append(metadata['event_time'][dfidx])
 
-# x = np.asarray(x)
-print(np.asarray(x).shape)
-print(type(x[0][0][0]))
+	# x = np.asarray(x)
+	print(np.asarray(x).shape)
+	print(type(x[0][0][0]))
 
 import h5py
 
