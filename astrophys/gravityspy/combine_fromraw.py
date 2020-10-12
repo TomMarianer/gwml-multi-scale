@@ -18,7 +18,6 @@ file_path = dirname(realpath(__file__))
 git_path = get_git_root(file_path)
 
 import sys
-# sys.path.append('/storage/home/tommaria/thesis/tools')
 sys.path.append(git_path + '/astrophys/tools')
 from tools_gs import *
 
@@ -27,8 +26,11 @@ from pathlib import Path
 import numpy as np
 from os.path import isfile, join
 from os import listdir
+import time
 
-data_path = Path('/storage/fast/users/tommaria/data/gravityspy/fromraw/training')
+start_time = time.time()
+
+data_path = Path('/storage/fast/users/tommaria/data/multi_scale/training')
 files = sorted(listdir(data_path))
 print(files)
 
@@ -41,20 +43,24 @@ for file in files:
 		continue
 
 	with h5py.File(join(data_path, file), 'r') as f:
-		x.extend(np.asarray(f['x']))
+		print(type)
+		x.extend(list(f['x']))
 		y.extend([item.decode('ascii') for item in list(f['y'])])
-		times.extend(np.asarray(f['times']))
+		times.extend(list(f['times']))
 
-x = np.asarray(x)
-print(x.shape)
-print(len(y))
-times = np.asarray(times)
+print(np.asarray(x).shape)
+print(type(x[0][0][0]))
+print(np.asarray(y).shape)
+print(np.asarray(times).shape)
 
 y = [item.encode('ascii') for item in y]
 
-data_path = Path('/storage/fast/users/tommaria/data/gravityspy/fromraw')
+data_path = Path('/storage/fast/users/tommaria/data/multi_scale/training/combined')
 
-with h5py.File(join(data_path, 'trainingset_fromraw_centered_2048_Tc_64_gs.hdf5'), 'w') as f:
+with h5py.File(join(data_path, 'trainingset.hdf5'), 'w') as f:
 	f.create_dataset('x', data=x)
 	f.create_dataset('y', data=y)
 	f.create_dataset('times', data=times)
+
+print('Done')
+print("--- Execution time is %.7s minutes ---\n" % ((time.time() - start_time) / 60))

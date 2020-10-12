@@ -4,6 +4,7 @@ tools for loading and conditioning strain data, and generating spectrograms
 parallel version
 """
 
+import psutil
 import git
 from gwosc.datasets import event_gps
 from gwpy.timeseries import TimeSeries
@@ -399,6 +400,68 @@ def load_condition_save(t_i, t_f, local=False, Tc=16, To=2, fw=2048, window='tuk
 
 	else:
 		return cond_data
+
+def load_condition_multi_scale(t_i, t_f, local=False, Tc=16, To=2, fw=2048, window='tukey', detector='H', input_shape=(299, 299), 
+							   scales=[0.5, 1.0, 2.0], frange=(10, 2048), qrange=(4, 100), data_path=None):
+	"""Function to load and condition multi-scale spectrograms
+	"""
+	vmem = psutil.virtual_memory()
+	free_mem = vmem.free >> 20
+	avail_mem = vmem.available >> 20
+	# if free_mem < 3e5:
+	if avail_mem < 3e5:
+		return 'not enough available memory'
+
+	conditioned_files = []
+	if exists(data_path):
+		conditioned_files = [join(data_path, f) for f in listdir(data_path) if isfile(join(data_path, f))]
+		# print(len(conditioned_files))
+	fname = 'conditioned-chunk-' + str(t_i) + '-' + str(t_f) + '.hdf5'
+	if join(data_path, fname) in conditioned_files:
+		# print(fname)
+		return
+
+	if local:
+		files = get_files(detector)
+		try:
+			data = TimeSeries.read(files, start=t_i, end=t_f, format='hdf5.losc') # load data locally
+		except:
+			return
+
+	else:
+		# load data from losc
+		try:
+			data = TimeSeries.fetch_open_data(detector + '1', *(t_i, t_f), sample_rate=fw, verbose=False, cache=True)
+		except:
+			return
+
+	if np.isnan(data.value).any():
+		return
+
+	cond_data = condition_data(data, To, fw, window, qtrans=False)
+	qt = cond_data.q_transform(frange=frange, qrange=qrange, whiten=True, tres=min(scales)/input_shape[0], 
+							   logf=True, fres=input_shape[1])
+	centers = np.arange(t_i + To/2.0 + max(scales)/2.0, t_f - To/2.0 - max(scales)/2.0 + min(scales), min(scales))
+	x = []
+	for center in centers:
+		x_scales = []
+		for scale in scales:
+			x_scales.append(qt.crop(center - scale / 2.0, center + scale / 2.0)[::int(scale/min(scales))])
+
+		x.append(x_scales)
+
+	if data_path == None:
+		data_path = Path('/storage/fast/users/tommaria/data/multi_scale/conditioned_data/16KHZ/' + detector + '1')
+
+	if not exists(data_path):
+		makedirs(data_path)
+
+	fname = 'conditioned-chunk-' + str(t_i) + '-' + str(t_f) + '.hdf5'
+	with h5py.File(join(data_path, fname), 'w') as f:
+		f.create_dataset('x', data=x)
+		f.create_dataset('times', data=centers)
+
+	return
 
 def condition_segments(segment_list, local=False, Tc=16, To=2, fw=2048, window='tukey', detector='H', 
 					   qtrans=False, qsplit=False, dT=2.0, save=False):
