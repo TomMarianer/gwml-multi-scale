@@ -454,7 +454,11 @@ def load_condition_multi_scale(t_i, t_f, local=False, Tc=16, To=2, fw=2048, wind
 		data_path = Path('/storage/fast/users/tommaria/data/multi_scale/conditioned_data/16KHZ/' + detector + '1')
 
 	if not exists(data_path):
-		makedirs(data_path)
+		try:
+			makedirs(data_path)
+
+		except:
+			pass
 
 	fname = 'conditioned-chunk-' + str(t_i) + '-' + str(t_f) + '.hdf5'
 	with h5py.File(join(data_path, fname), 'w') as f:

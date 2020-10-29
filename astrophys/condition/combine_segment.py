@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-script for conditioning raw strain data and generating spectrograms
-parallel version
+script for combining the conditioned spectrogram files
+used after conditioning using the condition_raw.py (or the condition_raw_par.py) script
 """
 
 import git
@@ -24,25 +24,22 @@ matplotlib.use('TkAgg')
 import sys
 # sys.path.append('/storage/home/tommaria/thesis/tools')
 sys.path.append(git_path + '/astrophys/tools')
-from tools_gs_par import *
-from params import *
+from tools_gs import *
 
 segment_list = get_segment_list('BOTH')
 detector = 'L'
+print(detector)
 
-files = get_files(detector)
-scales = [0.5, 1.0, 2.0]
-input_shape = (299, 299)
-local = True
-
-frange=(10, 2048)
-qrange=(4, 100)
-
-start_time = time.time()
 # H1 segments - 
 # L1 segments - 
+
+start_time = time.time()
+
+# for segment in segment_list[40:80]:
 for seg_num in np.asarray([326, 548, 587, 811, 877, 921, 1117, 1265, 1369, 1580, 1587, 1633, 1650, 1659, 1669, 1687]):
 	segment = segment_list[seg_num]
+
+	print(seg_num, segment)
 
 	t_i = segment[0]
 	t_f = segment[1]
@@ -50,22 +47,29 @@ for seg_num in np.asarray([326, 548, 587, 811, 877, 921, 1117, 1265, 1369, 1580,
 	data_path = Path('/storage/fast/users/tommaria/data/multi_scale/conditioned_data/16KHZ/' + detector + 
 	                 '1/segment-' + str(t_i) + '-' + str(t_f))
 
-	print(seg_num)
-	print(data_path)
+	files = [join(data_path, f) for f in sorted(listdir(data_path)) if isfile(join(data_path, f))]
 
-	chunks = get_chunks(t_i, t_f, Tc, To + (max(scales) - min(scales)))
+	x = []
+	times = []
 
-	pool = mp.Pool(mp.cpu_count() - 1)
-	results = pool.starmap(load_condition_multi_scale, [(chunk[0], chunk[1], local, Tc, To, fw, window, detector, \
-														 input_shape, scales, frange, qrange, data_path) for chunk in chunks])
-	
-	pool.close()
-	pool.join()
+	for file in files:
+		with h5py.File(join(data_path,file), 'r') as f:
+			x.extend(list(f['x']))
+			times.extend(list(f['times']))
 
-	for result in results:
-		if result == 'not enough available memory':
-			sys.exit('not enough available memory')
+	# x = np.asarray(x)
+	# times = np.asarray(times)
 
+	data_path = Path('/arch/tommaria/data/multi_scale/conditioned_data/16KHZ/' + detector + '1/combined')
+	if not exists(data_path):
+		makedirs(data_path)
 
-print('Done')
+	with h5py.File(join(data_path, 'segment-' + str(t_i) + '-' + str(t_f) + '.hdf5'), 'w') as f:
+		f.create_dataset('x', data=x)
+		f.create_dataset('times', data=times)
+
+	print(np.asarray(x).shape)
+	# print(type(x[0][0][0]))
+	print(np.asarray(times).shape)
+
 print("--- Execution time is %.7s minutes ---\n" % ((time.time() - start_time) / 60))
