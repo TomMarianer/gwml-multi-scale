@@ -439,16 +439,17 @@ def load_condition_multi_scale(t_i, t_f, local=False, Tc=16, To=2, fw=2048, wind
 		return
 
 	cond_data = condition_data(data, To, fw, window, qtrans=False)
-	qt = cond_data.q_transform(frange=frange, qrange=qrange, whiten=True, tres=min(scales)/input_shape[0], 
-							   logf=True, fres=input_shape[1])
-	centers = np.arange(t_i + To/2.0 + max(scales)/2.0, t_f - To/2.0 - max(scales)/2.0 + min(scales), min(scales))
-	x = []
-	for center in centers:
-		x_scales = []
-		for scale in scales:
-			x_scales.append(qt.crop(center - scale / 2.0, center + scale / 2.0)[::int(scale/min(scales))])
+	# qt = cond_data.q_transform(frange=frange, qrange=qrange, whiten=True, tres=min(scales)/input_shape[0], 
+	# 						   logf=True, fres=input_shape[1])
+	# centers = np.arange(t_i + To/2.0 + max(scales)/2.0, t_f - To/2.0 - max(scales)/2.0 + min(scales), min(scales))
+	# x = []
+	# for center in centers:
+	# 	x_scales = []
+	# 	for scale in scales:
+	# 		x_scales.append(qt.crop(center - scale / 2.0, center + scale / 2.0)[::int(scale/min(scales))])
 
-		x.append(x_scales)
+	# 	x.append(x_scales)
+	x, centers = qsplit_multi_scale(cond_data, t_i, t_f, To=To, frange=frange, qrange=qrange, input_shape=input_shape, scales=scales)
 
 	if data_path == None:
 		data_path = Path('/storage/fast/users/tommaria/data/multi_scale/conditioned_data/16KHZ/' + detector + '1')
@@ -466,6 +467,23 @@ def load_condition_multi_scale(t_i, t_f, local=False, Tc=16, To=2, fw=2048, wind
 		f.create_dataset('times', data=centers)
 
 	return
+
+def qsplit_multi_scale(data, t_i, t_f, To=2, frange=(10, 2048), qrange=(4, 100), input_shape=(299, 299), scales=[0.5, 1.0, 2.0]):
+	"""Generate multi-scale Q transform
+	"""
+
+	qt = data.q_transform(frange=frange, qrange=qrange, whiten=True, tres=min(scales)/input_shape[0], 
+							   logf=True, fres=input_shape[1])
+	centers = np.arange(t_i + To/2.0 + max(scales)/2.0, t_f - To/2.0 - max(scales)/2.0 + min(scales), min(scales))
+	x = []
+	for center in centers:
+		x_scales = []
+		for scale in scales:
+			x_scales.append(qt.crop(center - scale / 2.0, center + scale / 2.0)[::int(scale/min(scales))])
+
+		x.append(x_scales)
+
+	return np.asarray(x), centers
 
 def condition_segments(segment_list, local=False, Tc=16, To=2, fw=2048, window='tukey', detector='H', 
 					   qtrans=False, qsplit=False, dT=2.0, save=False):

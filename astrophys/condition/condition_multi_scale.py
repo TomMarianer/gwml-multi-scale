@@ -31,12 +31,12 @@ segment_list = get_segment_list('BOTH')
 detector = 'L'
 
 files = get_files(detector)
-scales = [0.5, 1.0, 2.0]
-input_shape = (299, 299)
+# scales = [0.5, 1.0, 2.0]
+# input_shape = (299, 299)
 local = True
 
-frange=(10, 2048)
-qrange=(4, 100)
+# frange=(10, 2048)
+# qrange=(4, 100)
 
 start_time = time.time()
 # H1 segments - 
