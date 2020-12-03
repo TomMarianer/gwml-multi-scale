@@ -1,0 +1,10 @@
+Model: adadelta/resnet152v2/gpu_test_15
+
+Test set - loss: 0.503575, accuracy: 0.969950
+
+Val set - loss: 0.143319, accuracy: 0.985477
+
+Train set - loss: 0.001129, accuracy: 0.999529
+
+--- Execution time is 277.331 seconds ---
+

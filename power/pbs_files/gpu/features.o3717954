@@ -1,0 +1,12 @@
+p list: [1]
+--- min-max time is 35.3440 minutes ---
+
+(4249, 100)
+(4249, 20)
+(1198, 26)
+(482, 26)
+(26,)
+--- test-val mean dev time is 17.3960 minutes ---
+
+--- save time is 32.9194 seconds ---
+
