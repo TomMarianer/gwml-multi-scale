@@ -77,11 +77,12 @@ def load_labelled_features(condition_method, model, features_path=Path('/Users/t
 		y_hat = np.append(y_hat, np.asarray(f['y_val_hat']), axis=0)
 	return features, y_hat
 
-def load_train_examples(condition_method, model, features_path=Path('/Users/tommarianer/LOSC Data/gravityspy/features')):
+def load_train_examples(condition_method, model, features_path=Path('/Users/tommarianer/LOSC Data/gravityspy/features'), data_path=None):
 	"""Load examples of training set for plotting maps.
 	"""
 
-	data_path = join(features_path, 'fromraw_' + condition_method + '/' + model)
+	if data_path == None:
+		data_path = join(features_path, 'fromraw_' + condition_method + '/' + model)
 	with h5py.File(join(data_path, 'training_examples.hdf5'), 'r') as f:
 		x_examples = np.asarray(f['x_examples'])
 		features_examples = np.asarray(f['features_examples'])
