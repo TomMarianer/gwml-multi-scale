@@ -114,7 +114,6 @@ def find_segment(t, segment_list):
 def gen_inject(wf_times, dt, t_inj, alpha, inj_type, inj_params, Tc, fw):
 	"""Inject waveform to data
 	"""
-
 	if inj_type == 'sg':
 		Hp, Hc = sine_gaussian(wf_times, t_inj, inj_params['f0'], inj_params['Q'])
 
@@ -148,7 +147,8 @@ def gen_inject(wf_times, dt, t_inj, alpha, inj_type, inj_params, Tc, fw):
 		f_high = inj_params['f_high']
 		tau = inj_params['tau']
 		params_path = Path(git_path + '/shared/injection_params')
-		with h5py.File(join(params_path, 'wn_f_low_' + str(f_low) + '_f_high_' + str(f_high) + '_tau_' + str(tau) + '.hdf5'), 'r') as f:
+		with h5py.File(join(params_path, 
+							'wn_f_low_' + str(int(f_low)) + '_f_high_' + str(int(f_high)) + '_tau_' + str(tau) + '.hdf5'), 'r') as f:
 			Hp = np.asarray(f['Hp'])
 			Hc = np.asarray(f['Hc'])
 
@@ -307,32 +307,7 @@ def load_inject_condition_ccsn(t_i, t_f, t_inj, ra, dec, pol, hp, hc, local=Fals
 	t_inj += delay
 	fp, fc = det_obj.antenna_pattern(ra, dec, pol, t_inj)
 
-	# wfs_path = Path(git_path + '/shared/ccsn_wfs/' + ccsn_paper)
-	# sim_data = [i.strip().split() for i in open(join(wfs_path, ccsn_file)).readlines()]
-	# if ccsn_paper == 'radice':
-	# 	line_s = 1
-	# else:
-	# 	line_s = 0
-
-	# D = D_kpc *  3.086e+21 # cm
-	# sim_times = np.asarray([float(dat[0]) for dat in sim_data[line_s:]])
-	# hp = np.asarray([float(dat[1]) for dat in sim_data[line_s:]]) / D
-	# if ccsn_paper == 'abdikamalov':
-	# 	hc = np.zeros(hp.shape)
-	# else:
-	# 	hc = np.asarray([float(dat[2]) for dat in sim_data[line_s:]]) / D
-
-	# dt = sim_times[1] - sim_times[0]
 	h = fp * hp + fc * hc
-	# h = TimeSeries(h, t0=sim_times[0], dt=dt)
-
-	# h = h.resample(rate=fw, ftype = 'iir', n=20) # downsample to working frequency fw
-	# h = h.highpass(frequency=11, filtfilt=True) # filter out frequencies below 20Hz
-	# inj_window = scisig.tukey(M=len(h), alpha=0.08, sym=True)
-	# h = h * inj_window
-
-	# h = h.pad(int((fw * Tc - len(h)) / 2))
-
 	wf_times = data.times.value
 
 	shift = int((t_inj - (wf_times[0] + Tc/2)) * fw)
@@ -417,7 +392,7 @@ def load_inject_condition_multi_scale(t_i, t_f, t_inj, ra, dec, pol, alpha, inj_
 	gc.collect()
 
 	# cond_data = condition_data(injected_data, To, fw, window, qtrans, qsplit, dT)
-	cond_data = condition_data(data, To, fw, window, qtrans=False)
+	cond_data = condition_data(injected_data, To, fw, window, qtrans=False)
 
 	del injected_data
 	gc.collect()
@@ -441,4 +416,82 @@ def load_inject_condition_multi_scale(t_i, t_f, t_inj, ra, dec, pol, alpha, inj_
 	x = x[idx]
 	times = times[idx]
 
+	return x, times
+
+def load_inject_condition_ccsn_multi_scale(t_i, t_f, t_inj, ra, dec, pol, hp, hc, local=False, Tc=16, To=2, fw=2048, window='tukey', 
+										   detector='H', input_shape=(299, 299), scales=[0.5, 1.0, 2.0], frange=(10, 2048), 
+										   qrange=(4, 100), save=False, data_path=None):
+	"""Fucntion to load a chunk, inject a waveform and condition, created to enable parallelizing.
+	"""
+	vmem = psutil.virtual_memory()
+	free_mem = vmem.free >> 20
+	avail_mem = vmem.available >> 20
+	# if free_mem < 3e5:
+	if avail_mem < 3e5:
+		return
+
+	if local:
+		files = get_files(detector)
+		try:
+			data = TimeSeries.read(files, start=t_i, end=t_f, format='hdf5.losc') # load data locally
+		except:
+			return
+
+	else:
+		# load data from losc
+		try:
+			data = TimeSeries.fetch_open_data(detector + '1', *(t_i, t_f), sample_rate=fw, verbose=False, cache=True)
+		except:
+			return
+
+	if np.isnan(data.value).any():
+		return
+
+	det_obj = Detector(detector + '1')
+	delay = det_obj.time_delay_from_detector(Detector('H1'), ra, dec, t_inj)
+	t_inj += delay
+	fp, fc = det_obj.antenna_pattern(ra, dec, pol, t_inj)
+
+	h = fp * hp + fc * hc
+	wf_times = data.times.value
+
+	shift = int((t_inj - (wf_times[0] + Tc/2)) * fw)
+	h = np.roll(h.value, shift)
+	
+	h = TimeSeries(h, t0=wf_times[0], dt=data.dt)
+	try:
+		h = h.taper()
+	except:
+		pass
+
+	injected_data = data.inject(h)
+
+	del data
+	gc.collect()
+	
+	# cond_data = condition_data(injected_data, To, fw, window, qtrans, qsplit, dT)
+	cond_data = condition_data(injected_data, To, fw, window, qtrans=False)
+
+	del injected_data
+	gc.collect()
+
+	# x = []
+	# times = []
+
+	# for dat in cond_data:
+	# 	x.append(dat.values)
+	# 	times.append(dat.t0)
+	x, times = qsplit_multi_scale(cond_data, t_i, t_f, To=To, frange=frange, qrange=qrange, input_shape=input_shape, scales=scales)
+
+	del cond_data
+	gc.collect()
+
+	x = np.asarray(x)
+	times = np.asarray(times)
+
+	# idx = find_closest_index(t_inj, times)
+	idx = find_closest_index(t_inj, times - min(scales) / 2)
+
+	x = x[idx]
+	times = times[idx]
 	return x, times
